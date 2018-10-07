@@ -2,7 +2,11 @@
   "name": "voronoi-projection",
   "version": "0.0.1",
   "description": "Voronoi projection.",
-  "keywords": ["d3", "geo", "polygon"],
+  "keywords": [
+    "d3",
+    "geo",
+    "polygon"
+  ],
   "homepage": "https://github.com/Fil/voronoi-projection",
   "license": "MIT",
   "author": {
@@ -17,6 +21,7 @@
     "canvas": "1",
     "commander": "2",
     "d3-array": "^0",
+    "d3-collection": "^1.0.7",
     "d3-delaunay": "^4",
     "d3-geo": "^1.10",
     "d3-geo-polygon": "^1",

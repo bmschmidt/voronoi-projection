@@ -3,17 +3,21 @@
 const fs = require("fs"),
   topojson = require("topojson-client"),
   Canvas = require("canvas"),
+  beagle = require("./beagle"),    
   d3 = Object.assign(
     {},
     require("d3-array"),
     require("d3-geo"),
     require("d3-geo-polygon"),
     require("d3-geo-voronoi"),
-    require("d3-scale-chromatic")
+    require("d3-scale-chromatic"),
+    require("d3-collection")
   ),
   radians = Math.PI / 180;
 
 const commander = require("commander");
+
+
 
 commander
   .version(require("./package.json").version)
@@ -32,6 +36,7 @@ commander
     "auto"
   )
   .option("--ocean", "favor ocean links", false)
+  .option("--beagle", "use beagle points", false)
   .option("--fibonacci", "fibonacci distribution", false)
   .option("--centroids", "large countries centroids distribution", false)
   .option("--noise <value>", "perturbation (try: 1)", 0)
@@ -54,7 +59,7 @@ const n = +commander.n,
     ? centroids
     : commander.fibonacci
       ? fibonacci
-      : randompoints;
+        : randompoints;
 
 var time = Date.now();
 
@@ -91,7 +96,7 @@ process.stderr.write("computing distances… ");
 
 const contains = geoContainsCache(land),
   inland = points.map(d => +contains(d)),
-  shore = points.map(dist2shore());
+      shore = points.map(dist2shore()).map(d => Math.abs(d));
 
 function cost2(a, b) {
   var mult = (1 + shore[a[2]]) ** 2 * (1 + shore[b[2]]) ** 2;
@@ -289,7 +294,8 @@ if (commander.colors !== "none") {
 } else {
   context.beginPath();
   path({ type: "Sphere" });
-  context.fillStyle = "#fefef6";
+  context.fillStyle = "rgba(70,130,255,0.5)";  
+//  context.fillStyle = "#fefef6";
   context.fill();
 }
 
@@ -321,9 +327,26 @@ switch (commander.land) {
   case "none":
     break;
 }
-context.fillStyle = "#000";
+
+
+context.fillStyle = "rgba(70,130,255,0.5)";
+context.fillStyle = "rgba(70,255,70,0.9)";
 context.fill();
 
+
+if (commander.beagle) {
+  console.warn(Date.now() - time);
+  time = Date.now();
+  process.stderr.write("projecting beagle… ");
+  context.beginPath();
+  path(beagle);
+  context.lineWidth = 4;
+  context.strokeStyle = "rgba(10,119,200,0.5)";
+  context.stroke();
+  context.beginPath()
+}
+
+context.lineWidth = 1;
 if (commander.graticule) {
   console.warn(Date.now() - time);
   time = Date.now();
@@ -334,13 +357,14 @@ if (commander.graticule) {
   context.stroke();
 }
 
+
 console.warn(Date.now() - time);
 time = Date.now();
 process.stderr.write("projecting sphere… ");
 context.beginPath();
 path({ type: "Sphere" });
 context.strokeStyle = "#000";
-context.stroke();
+//context.stroke();
 
 console.warn(Date.now() - time);
 time = Date.now();
@@ -360,7 +384,7 @@ function geoContainsCache(land) {
   canvas.height = h;
   context.fillStyle = "white";
   context.fillRect(0, 0, w, h);
-  context.fillStyle = "black";
+  context.fillStyle = 'rgba(77, 77, 77, .3)';
   context.beginPath(), path(land), context.fill();
   var c = context.getImageData(0, 0, w, h).data;
   canvas = context = path = null; // free up memory
@@ -371,8 +395,19 @@ function geoContainsCache(land) {
 }
 
 function dist2shore() {
-  const vertices = geoVertices(land),
-    delaunay = d3.geoDelaunay(vertices);
+  let vertices = commander.beagle ? geoVertices(beagle) : geoVertices(land);
+  if (commander.beagle) {
+    let first_vertex = [0, 0]
+    vertices = vertices.filter( (d) => {
+      const [ lon, lat ] = d;
+      if (d3.geoDistance([lon, lat], first_vertex) > 0.05) {
+	first_vertex = d
+	return true;
+      }
+      return false;
+    })
+  }
+  const delaunay = d3.geoDelaunay(vertices);
   return function(a) {
     return (
       d3.geoDistance(a, vertices[delaunay.find(a[0], a[1])]) *
@@ -391,6 +426,14 @@ function randompoints(n) {
         90 * (Math.random() - Math.random())
       ])
   );
+}
+
+
+function beagle_coords(n) {
+  const coords = d3.set(beagle.coordinates).values()
+  const output = coords.slice(0, n)
+  console.log(output)
+  return output
 }
 
 function fibonacci(n) {
